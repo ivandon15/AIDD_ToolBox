@@ -116,7 +116,8 @@ def other_to_cif(input_file, output_cif_file, comp_id="MY-X7F"):
     with open(output_cif_file, "w") as file:
         file.write(cif_content)
 
-    return "\\n".join(cif_content.split("\n"))
+    return "\\n".join(cif_content.strip().split("\n"))
+
 
 
 
