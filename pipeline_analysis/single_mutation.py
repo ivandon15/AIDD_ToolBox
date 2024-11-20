@@ -89,6 +89,12 @@ def analyze_groups(groups, infos):
 
     return idx_differences
 
+def zero_out_lower_left(matrix):
+    rows, _ = matrix.shape
+    for i in range(rows):
+        for j in range(i + 1):
+            matrix[i, j] = 0
+    return matrix
 
 def visualize_heatmap(idx, group_info):
     """
@@ -104,7 +110,7 @@ def visualize_heatmap(idx, group_info):
                     if aa1 == aa2:
                         kd_delta = 0
                     elif not math.isnan(kd_values[i]) and not math.isnan(kd_values[j]):
-                        kd_delta = kd_values[i] - kd_values[j]
+                        kd_delta = kd_values[j] - kd_values[i]
                     else:
                         kd_delta = 0
                     kd_deltas.append(kd_delta)
@@ -119,7 +125,11 @@ def visualize_heatmap(idx, group_info):
     for (aa1, aa2), kd_delta in zip(aa_pairs, kd_deltas):
         i, j = aa_index[aa1], aa_index[aa2]
         heatmap_data[i, j] += kd_delta
+        heatmap_data[j, i] += -1*kd_delta
         count_matrix[i, j] += 1
+        count_matrix[j, i] += 1
+    heatmap_data = zero_out_lower_left(heatmap_data)
+    
     print("count_matrix, ", count_matrix)
     heatmap_data = np.divide(heatmap_data, count_matrix, where=count_matrix != 0)
     print("heatmap_data, ", heatmap_data)
