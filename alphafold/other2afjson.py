@@ -3,63 +3,30 @@ import pandas as pd
 from tqdm import tqdm
 from pymol import cmd
 from Bio.SeqUtils import seq1
-from rdkit import Chem
+import rdkit.Chem as rd_chem
 from rdkit.Chem import AllChem
 from alphafold3.common import folding_input
 from alphafold3.constants import chemical_components
-from alphafold3.data.tools.rdkit_utils import mol_to_ccd_cif
+# from alphafold3.data.tools.rdkit_utils import *
+from other2mmcif import smiles2cif
 
 # Load chemical components dictionary
 ccd = chemical_components.cached_ccd()
 # Build the smi2ccd mapping
 smi2ccd = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)),"smi2ccd.json"),"r"))
 
+
 def canonical_smiles(smiles):
     """Convert a SMILES string to its canonical form."""
-    mol = Chem.MolFromSmiles(smiles)
+    mol = rd_chem.MolFromSmiles(smiles)
     if mol is None:
         raise ValueError(f"Invalid SMILES: {smiles}")
-    return Chem.MolToSmiles(mol, canonical=True, isomericSmiles=True)
+    return rd_chem.MolToSmiles(mol, canonical=True, isomericSmiles=True)
 
 
 def find_ccd(smiles):
     smiles = canonical_smiles(smiles)
     return smi2ccd.get(smiles, None)
-
-
-def process_molecule(mol):
-    """
-    Standardize and add hydrogens to a molecule.
-
-    Args:
-        mol (RDKit Mol object): The input molecule.
-
-    Returns:
-        RDKit Mol object: The standardized molecule with hydrogens added.
-    """
-    mol_with_h = Chem.AddHs(mol)
-
-    # Generate 3D coordinates if not already present
-    try: 
-        mol_with_h.GetConformer().Is3D()
-    except:
-        AllChem.EmbedMolecule(mol_with_h, randomSeed=42)
-
-    return mol_with_h
-
-
-def smiles2cif(smiles, output_cif_file=None, comp_id="MY-X7F"):
-    """
-    Utilizing af3 rdkit tools to translate smiles to af3-readable cif,
-    better using output_cif_file if you need to know the name of atom
-    """
-    mol = process_molecule(Chem.MolFromSmiles(smiles))
-    cif_content = str(mol_to_ccd_cif(mol, component_id=comp_id))
-    if output_cif_file:
-        with open(output_cif_file, "w") as file:
-            file.write(cif_content)
-
-    return "\\n".join(cif_content.strip().split("\n")),cif_content.strip()
 
 
 def _format_bondedAtomPairs(cyclic_pos, linker_pos, pep_id, linker_id):
@@ -108,9 +75,10 @@ def _lst2seq(lst, lookup_dict=None):
     seq_aa = []
     position_dict = {}
     userCCDs = set()
-    
     for id, aa3 in enumerate(lst, start=1):
-        aa1 = seq1(aa3)
+        ccdCode = None
+        
+        aa1 = seq1(aa3)[0]
         if aa1 == "X":
             ccd_info = ccd.get(aa3)
             if not ccd_info:
@@ -132,7 +100,7 @@ def _lst2seq(lst, lookup_dict=None):
             else:
                 aa1 = ccd_info['_chem_comp.one_letter_code'][0]
                 aa1 = "X" if aa1 == "?" else aa1
-            position_dict[id] = aa3
+            position_dict[id] = ccdCode if ccdCode else aa3
         seq_aa.append(aa1)
     
     return "".join(seq_aa), userCCDs, position_dict
